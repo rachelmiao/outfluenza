@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<head>
+<style type="text/css">
+body {
+    background-color: #fff;
+    font-family: helvetica;
+    font-size: 13px;
+    color: #555;
+}
+/* minimal
+*******************************************************************************/
+button.minimal {
+  background: #e3e3e3;
+  border: 1px solid #bbb;
+  -webkit-border-radius: 3px;
+  -moz-border-radius: 3px;
+  border-radius: 3px;
+  -webkit-box-shadow: inset 0 0 1px 1px #f6f6f6;
+  -moz-box-shadow: inset 0 0 1px 1px #f6f6f6;
+  box-shadow: inset 0 0 1px 1px #f6f6f6;
+  color: #333;
+  font: bold 12px "helvetica neue", helvetica, arial, sans-serif;
+  line-height: 1;
+  padding: 8px 0 9px;
+  text-align: center;
+  text-shadow: 0 1px 0 #fff;
+  padding: 5px 15px;
+  margin-top: 10px;
+  }
+  button.minimal:hover {
+    background: #d9d9d9;
+    -webkit-box-shadow: inset 0 0 1px 1px #eaeaea;
+    -moz-box-shadow: inset 0 0 1px 1px #eaeaea;
+    box-shadow: inset 0 0 1px 1px #eaeaea;
+    color: #222;
+    cursor: pointer; }
+  button.minimal:active {
+    background: #d0d0d0;
+    -webkit-box-shadow: inset 0 0 1px 1px #e3e3e3;
+    -moz-box-shadow: inset 0 0 1px 1px #e3e3e3;
+    box-shadow: inset 0 0 1px 1px #e3e3e3;
+    color: #000; }
+.header {
+    position: fixed;
+    top: 17px;
+    left: 8px;
+    width: 910px;
+    height: 103px;
+    background-color: #fff;
+    padding: 10px;
+    text-align: center;
+}
+.main {
+    position: fixed;
+    background-color: #fff;
+    top: 120px;
+}
+.maintitle {
+    color: #000;
+    font-family: helvetica;
+    font-size: 50px;
+    font-weight: 100;
+}
+.title {
+    font-family: helvetica;
+    font-size: 25px;
+    font-weight: 100;
+    line-height: 1.4em;
+
+}
+.subtitle {
+    font-family: helvetica;
+    font-size: 14px;
+    line-height: 1.0em;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: #000;
+    font-weight: bolder;
+}
+.nav {
+    position: fixed;
+    width: 200px;
+    height: 586px;
+    top: 17px;
+    left: 950px;
+    background-color: #f6f6f6;
+    padding: 10px;
+}
+
+.box {
+    border: 5px #fff solid;
+    margin-top: 10px;
+    font-size: 20px;
+    width: 188px;
+    font-family: helvetica;
+    color: rgb(66, 146, 198);
+}
+.counties {
+  fill: none;
+}
+
+button {
+    font-family: helvetica;
+}
+
+.states {
+  fill: none;
+  stroke: #fff;
+  stroke-linejoin: round;
+}
+
+.q0-9 { fill:rgb(247,251,255); }
+.q1-9 { fill:rgb(222,235,247); }
+.q2-9 { fill:rgb(198,219,239); }
+.q3-9 { fill:rgb(158,202,225); }
+.q4-9 { fill:rgb(107,174,214); }
+.q5-9 { fill:rgb(66,146,198); }
+.q6-9 { fill:rgb(33,113,181); }
+.q7-9 { fill:rgb(8,81,156); }
+.q8-9 { fill:rgb(8,48,107); }
+
+</style>
+</head>
+<body onload="getData()">
+  <div class="nav">
+    <span class="title">where are you?</span><br />
+    Get detailed information about a specific area.
+    <input id="location" type="text" class="box" placeholder="Enter ZIP">
+    <button type="submit" value="go" class="minimal">Go!</button><br /><br />
+    <span class="title">time lapse</span><br />
+    Look at our past maps and use our predictive features.<br /><br />
+    
+  <form>
+    <input type="range" name="dataset" value="salary" min="0" max="100" onchange="getData" />
+  </form>
+    <button type="submit" value="animate" class="minimal">Animate!</button>
+</div>
+<div class="main" onload="getData()">
+<script src="http://d3js.org/d3.v3.min.js"></script>
+<script src="http://d3js.org/queue.v1.min.js"></script>
+<script src="http://d3js.org/topojson.v1.min.js"></script>
+<script>
+var from_form = document.forms[0].dataset.value;
+window.onload = function() {
+  document.getElementById("location").focus();
+}
+
+var file = "unemployment.tsv";
+var time = 1;
+function getData(salary){
+  time = document.forms[0].dataset.value;
+  switch(time) {
+    case "0":
+      file = "past.tsv";
+      break;
+    case "1":
+      file = "unemployment.tsv";
+      break;
+    case "2":
+      file = "future.tsv";
+      break;
+  }
+}
+
+var width = 910,
+    height = 500;
+
+var rateById = d3.map();
+
+var quantize = d3.scale.quantize()
+    .domain([0, .15])
+    .range(d3.range(9).map(function(i) { return "q" + i + "-9"; }));
+
+var path = d3.geo.path();
+
+var svg = d3.select(".main").append("svg")
+    .attr("width", width)
+    .attr("height", height);
+
+var past_index = 0;
+var present_index = 1;
+var future_index = 0;
+
+function calculate(slider) {
+    past_index = (50 - slider) / 50;
+    if (past_index < 0) { past_index = 0; }
+    present_index = 1 - Math.abs((slider - 50) / 50);
+    future_index = (slider - 50) / 50;
+    if (future_index < 0) {future_index = 0; }
+    return past_index.toString() + "; " + present_index.toString() + "; " + future_index.toString();
+  };
+
+function queue_past() {
+  queue()
+    .defer(d3.json, "us.json")
+    .defer(d3.tsv, "all.tsv", function(d) { rateById.set(d.id, +d.past); })
+    .await(ready);
+};
+
+function queue_present() {
+  queue()
+    .defer(d3.json, "us.json")
+    .defer(d3.tsv, "all.tsv", function(d) { rateById.set(d.id, +d.present); })
+    .await(ready);
+};
+
+function queue_future() {
+  queue()
+    .defer(d3.json, "us.json")
+    .defer(d3.tsv, "all.tsv", function(d) { rateById.set(d.id, +d.future); })
+    .await(ready);
+};
+
+
+var manual_list = new Array(0.1, 0.2, 0.3, 0.4);
+var temp;
+
+function queue_compiled() {
+  queue()
+    .defer(d3.json, "us.json")
+    .defer(d3.tsv, "all.tsv", function(d) {
+        temp = d;
+        rateById.set(d.id, manual_list); })
+//      rateById.set(d.id, +d.past * past_index + +d.present * present_index + +d.future * future_index); })
+    .await(ready);
+};
+
+function ready(error, us) {
+  svg.append("g")
+      .attr("class", "counties")
+    .selectAll("path")
+      .data(topojson.feature(us, us.objects.counties).features)
+    .enter().append("path")
+      .attr("class", function(d) { return quantize(rateById.get(d.id)); })
+      .attr("d", path);
+
+  svg.append("path")
+      .datum(topojson.mesh(us, us.objects.states, function(a, b) { return a !== b; }))
+      .attr("class", "states")
+      .attr("d", path);
+}
+
+d3.selectAll("input").on("change", change);
+
+    var timeout = setTimeout(function() {
+      // d3.select("input[value=\"oranges\"]").property("checked", true).each(change);
+      d3.select("input[value=\"salary\"]").each(change);
+    }, 2000);
+
+  function change() {
+
+    getData(time);
+    if (time == 0) { queue_past(); }
+    else if (time == 1) { queue_present(); }
+    else if (time == 2) { queue_future(); }
+    else {queue_compiled(); }
+    console.log(calculate(time));
+  }
+</script>
+</div>
+    <div class="header">
+        <span class="maintitle">Live Influenza Tracking</span>
+        <br /><span class="subtitle">
+        Realtime information on the spread of influenza</span></div>
+    
+</body>
+</html>
